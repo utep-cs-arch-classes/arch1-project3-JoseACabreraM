@@ -18,19 +18,49 @@
 
 
 AbRect rect10 = {abRectGetBounds, abRectCheck, {10,10}}; /**< 10x10 rectangle */
+AbRect pongBar = {abRectGetBounds, abRectCheck, {14,3}};
 AbRArrow rightArrow = {abRArrowGetBounds, abRArrowCheck, 30};
+
+static int leftPongBarYPosition = 0;
+static int rightPongBarYPosition = 0;
 
 AbRectOutline fieldOutline = {	/* playing field */
   abRectOutlineGetBounds, abRectOutlineCheck,   
-  {screenWidth/2 - 10, screenHeight/2 - 10}
+  {screenWidth/2 - 3, screenHeight/2 - 1}
 };
+
+Layer leftPongBar = {
+  (AbShape *)&pongBar,
+  {(screenWidth/2), 25},
+  {0,0}, {0,0},
+  COLOR_BLACK,
+  0
+};
+
+Layer rightPongBar = {
+(AbShape *)&pongBar,
+  {(screenWidth/2), screenHeight-5},
+  {0,0}, {0,0},
+  COLOR_BLACK,
+  &leftPongBar
+};
+
+/*
+Layer testLayer = {
+  (AbShape *)&pongBar,
+  {(screenWidth/2), (screenHeight/2)},
+  {0,0}, {0,0},
+  COLOR_BLACK,
+  &rightPongBar
+};
+*/
 
 Layer layer4 = {
   (AbShape *)&rightArrow,
   {(screenWidth/2)+10, (screenHeight/2)+5}, /**< bit below & right of center */
   {0,0}, {0,0},				    /* last & next pos */
   COLOR_PINK,
-  0
+  &rightPongBar
 };
   
 
@@ -78,15 +108,13 @@ typedef struct MovLayer_s {
 } MovLayer;
 
 /* initial value of {0,0} will be overwritten */
-MovLayer ml3 = { &layer3, {1,1}, 0 }; /**< not all layers move */
+//MovLayer mTestLayer = { &testLayer, {4,4}, 0};
+
+MovLayer mLeftPongBar = { &leftPongBar, {1,1}, 0 };
+MovLayer mRightPongBar = { &rightPongBar, {1,1}, 0 };
+MovLayer ml3 = { &layer3, {1,1}, 0}; /**< not all layers move */
 MovLayer ml1 = { &layer1, {1,2}, &ml3 }; 
 MovLayer ml0 = { &layer0, {2,1}, &ml1 }; 
-
-
-
-
-
-
 
 movLayerDraw(MovLayer *movLayers, Layer *layers)
 {
@@ -134,7 +162,7 @@ movLayerDraw(MovLayer *movLayers, Layer *layers)
  *  \param ml The moving shape to be advanced
  *  \param fence The region which will serve as a boundary for ml
  */
-void mlAdvance(MovLayer *ml, Region *fence)
+void mlAdvance(MovLayer *ml, Region *fence, Region *leftPongBarFence, Region *rightPongBarFence)
 {
   Vec2 newPos;
   u_char axis;
@@ -142,15 +170,74 @@ void mlAdvance(MovLayer *ml, Region *fence)
   for (; ml; ml = ml->next) {
     vec2Add(&newPos, &ml->layer->posNext, &ml->velocity);
     abShapeGetBounds(ml->layer->abShape, &newPos, &shapeBoundary);
-    for (axis = 0; axis < 2; axis ++) {
+    for (axis = 0; axis < 2; axis ++) { 
       if ((shapeBoundary.topLeft.axes[axis] < fence->topLeft.axes[axis]) ||
 	  (shapeBoundary.botRight.axes[axis] > fence->botRight.axes[axis]) ) {
 	int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
 	newPos.axes[axis] += (2*velocity);
-      }	/**< if outside of fence */
+      }   /**< if outside of fence */
+      if (/*(shapeBoundary.topLeft.axes[axis] == mLeftPongBar.layer->pos.axes[axis]) ||*/
+	  (shapeBoundary.botRight.axes[axis] == mLeftPongBar.layer->pos.axes[axis])) {
+	int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
+	newPos.axes[axis] += (2*velocity);
+      }
+      if ((shapeBoundary.topLeft.axes[axis] == mRightPongBar.layer->pos.axes[axis]) ||
+	  (shapeBoundary.botRight.axes[axis] == mRightPongBar.layer->pos.axes[axis]) ) {
+	int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
+	newPos.axes[axis] += (2*velocity);
+      }
     } /**< for axis */
     ml->layer->posNext = newPos;
   } /**< for ml */
+}
+
+
+void movLeftPongBar(int switches){
+
+    mLeftPongBar.layer->posNext.axes[0] = mLeftPongBar.layer->pos.axes[0] + leftPongBarYPosition;
+    //int switches = p2sw_read();
+    //int switches1 = switches & BIT0;
+    //int switches2 = switches & BIT1;
+    if (!(1&switches)){
+      if (mLeftPongBar.layer->pos.axes[0] >= 20){
+	leftPongBarYPosition = -5;
+      } else {
+	leftPongBarYPosition = 0;
+      }
+    } else if (!(2 & switches)){
+      if (mLeftPongBar.layer->pos.axes[0] <= screenWidth - 20){
+	leftPongBarYPosition = 5;
+      }  else {
+	leftPongBarYPosition = 0;
+      }
+    } else {
+	leftPongBarYPosition = 0;
+    }
+    movLayerDraw(&mLeftPongBar, &leftPongBar);
+}
+
+void movRightPongBar(int switches){
+
+    mRightPongBar.layer->posNext.axes[0] = mRightPongBar.layer->pos.axes[0] + rightPongBarYPosition;
+    //int switches = p2sw_read();
+    //int switches1 = switches & BIT0;
+    //int switches2 = switches & BIT1;
+    if (!(1 &switches)){
+      if (mRightPongBar.layer->pos.axes[0] >= 20){
+	rightPongBarYPosition = -10;
+      } else {
+	rightPongBarYPosition = 0;
+      }
+    } else if (!(2 & switches)){
+      if (mRightPongBar.layer->pos.axes[0] <= screenWidth - 20){
+	rightPongBarYPosition = 10;
+      }  else {
+	rightPongBarYPosition = 0;
+      }
+    } else {
+	rightPongBarYPosition = 0;
+    }
+    movLayerDraw(&mRightPongBar, &rightPongBar);
 }
 
 
@@ -158,6 +245,8 @@ u_int bgColor = COLOR_BLUE;     /**< The background color */
 int redrawScreen = 1;           /**< Boolean for whether screen needs to be redrawn */
 
 Region fieldFence;		/**< fence around playing field  */
+Region leftPongBarFence;
+Region rightPongBarFence;
 
 
 /** Initializes everything, enables interrupts and green LED, 
@@ -171,7 +260,7 @@ void main()
   configureClocks();
   lcd_init();
   shapeInit();
-  p2sw_init(1);
+  p2sw_init(31);
 
   shapeInit();
 
@@ -179,12 +268,16 @@ void main()
   layerDraw(&layer0);
 
 
-  layerGetBounds(&fieldLayer, &fieldFence);
-
-
+  //layerGetBounds(&fieldLayer, &fieldFence);
+   layerGetBounds(&fieldLayer, &fieldFence); 
+   layerGetBounds(&leftPongBar,&leftPongBarFence); 
+   layerGetBounds(&rightPongBar,&rightPongBarFence);
+   
   enableWDTInterrupts();      /**< enable periodic interrupt */
   or_sr(0x8);	              /**< GIE (enable interrupts) */
 
+  
+  
 
   for(;;) { 
     while (!redrawScreen) { /**< Pause CPU if screen doesn't need updating */
@@ -193,6 +286,19 @@ void main()
     }
     P1OUT |= GREEN_LED;       /**< Green led on when CPU on */
     redrawScreen = 0;
+    /*
+    mLeftPongBar.layer->posNext.axes[1] = mLeftPongBar.layer->pos.axes[1] + leftPongBarYPosition;
+    int switches = p2sw_read();
+    if (!switches){
+      leftPongBarYPosition -= 10;
+    } else {
+      leftPongBarYPosition = 0;
+    }
+    */
+    int switches = p2sw_read();
+    movLeftPongBar(switches);
+    movRightPongBar(switches);
+    //movLayerDraw(&mLeftPongBar, &leftPongBar);
     movLayerDraw(&ml0, &layer0);
   }
 }
@@ -204,8 +310,8 @@ void wdt_c_handler()
   P1OUT |= GREEN_LED;		      /**< Green LED on when cpu on */
   count ++;
   if (count == 15) {
-    mlAdvance(&ml0, &fieldFence);
-    if (p2sw_read())
+    mlAdvance(&ml0, &fieldFence, &leftPongBarFence, &rightPongBarFence);
+    //if (p2sw_read())
       redrawScreen = 1;
     count = 0;
   }

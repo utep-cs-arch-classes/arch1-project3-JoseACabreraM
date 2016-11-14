@@ -37,6 +37,19 @@ void fillRectangle(u_char colMin, u_char rowMin, u_char width, u_char height,
   }
 }
 
+void fillLine(u_int colorBGR){
+
+  lcd_setArea(50, 50, 69, 79);
+  u_int total = 20 * 30;
+  u_int c = 0;
+  while ((c++) < total){
+    lcd_writeColor(colorBGR);
+  }
+
+}
+	      
+
+
 /** Clear screen (fill with color)
  *  
  *  \param colorBGR The color to fill screen

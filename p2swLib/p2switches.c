@@ -35,7 +35,8 @@ unsigned int
 p2sw_read() {
   unsigned int sw_changed = switches_current ^ switches_last_reported;
   switches_last_reported = switches_current;
-  return switches_current | (sw_changed << 8);
+  switch_update_interrupt_sense();
+  return switches_current /*| (sw_changed << 8)*/;
 }
 
 /* Switch on P2 (S1) */
