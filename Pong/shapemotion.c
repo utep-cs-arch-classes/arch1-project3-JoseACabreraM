@@ -77,7 +77,7 @@ Layer layer0 = {		/**< Layer with an orange circle */
 
 MovLayer mtopPongBar = {&topPongBar, {1,1}, 0};
 MovLayer mbottomPongBar = {&bottomPongBar, {1,1}, 0};
-MovLayer ml0 = {&layer0, {4,3}, 0}; 
+MovLayer ml0 = {&layer0, {3,2}, 0}; 
 
 movLayerDraw(MovLayer *movLayers, Layer *layers)
 {
@@ -132,32 +132,31 @@ void mlAdvance(MovLayer *ml, Region *fence, Region *topPongBarFence, Region *bot
   for (; ml; ml = ml->next) {
     vec2Add(&newPos, &ml->layer->posNext, &ml->velocity);
     abShapeGetBounds(ml->layer->abShape, &newPos, &shapeBoundary);
-    for (axis = 0; axis < 2; axis ++) { 
-      if ( (shapeBoundary.topLeft.axes[axis] < fence->topLeft.axes[axis]) || (shapeBoundary.botRight.axes[axis] > fence->botRight.axes[axis])){
+    for (axis = 0; axis < 2; axis++) {
+      // If the ball hits the fence
+      if ((shapeBoundary.topLeft.axes[axis] < fence->topLeft.axes[axis]) || (shapeBoundary.botRight.axes[axis] > fence->botRight.axes[axis])){
 	    int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
 	    newPos.axes[axis] += (2*velocity);
-      }   /**< if outside of fence */
-      if (detectCollisionTop(&pongBar, &(topPongBar.pos), &(ml->layer->pos))){
-	    if (axis == 1){
-	      int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
-	      newPos.axes[axis] += (2*velocity);
-	    }
       }
-      if (detectCollisionBottom(&pongBar, &(bottomPongBar.pos), &(ml->layer->pos))){
-        if (axis == 1){
-	      int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
-	      newPos.axes[axis] += (2*velocity);
-	    }
+      // If the ball hits the top pong bar, only checking on the Y-Axis 
+      if (detectCollisionTop(&pongBar, &(topPongBar.pos), &(ml->layer->pos)) && axis == 1){
+        int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
+	newPos.axes[axis] += (2*velocity);
+      }
+      // If the ball hits the bottom pong bar, only checking on the Y-Axis
+      if (detectCollisionBottom(&pongBar, &(bottomPongBar.pos), &(ml->layer->pos)) && axis == 1){
+        int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
+	newPos.axes[axis] += (2*velocity);
       }
     } 
     ml->layer->posNext = newPos;
-  } 
+  }
 }
 
 int detectCollisionTop(const AbRect* rect, const Vec2* centerPos, const Vec2 *pixel){
   int i = 0;
   Vec2 centerPos1 = *centerPos;
-  for (i = -8; i < 8; i++){
+  for (i = -7; i < 7; i++){
     centerPos1.axes[0] += i;
     centerPos1.axes[1] += 10;
     int collision = abRectCheck(rect, &centerPos1, pixel);
@@ -173,7 +172,7 @@ int detectCollisionTop(const AbRect* rect, const Vec2* centerPos, const Vec2 *pi
 int detectCollisionBottom(const AbRect* rect, const Vec2* centerPos, const Vec2 *pixel){
   int i = 0;
   Vec2 centerPos1 = *centerPos;
-  for (i = -8; i < 8; i++){
+  for (i = -7; i < 7; i++){
     centerPos1.axes[0] += i;
     centerPos1.axes[1] -= 10;
     int collision = abRectCheck(rect, &centerPos1, pixel);
@@ -266,6 +265,8 @@ void main()
     }
     P1OUT |= GREEN_LED;       /**< Green led on when CPU on */
     redrawScreen = 0;
+    drawString5x7(7, 5, "Player 1", COLOR_WHITE, COLOR_BLUE);
+    drawString5x7(screenWidth/2 + 10, screenHeight-10, "Player 2", COLOR_WHITE, COLOR_BLUE);
     int switches = p2sw_read();
     movtopPongBar(switches);
     movbottomPongBar(switches);
@@ -281,7 +282,7 @@ void wdt_c_handler()
   count ++;
   if (count == 15) {
     mlAdvance(&ml0, &fieldFence, &topPongBarFence, &bottomPongBarFence);
-    //if (p2sw_read())
+    if (p2sw_read())
       redrawScreen = 1;
     count = 0;
   }
