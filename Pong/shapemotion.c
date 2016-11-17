@@ -6,6 +6,7 @@
  *  when the screen does not need to be redrawn the CPU
  *  is turned off along with the green LED.
  */  
+ 
 #include <msp430.h>
 #include <libTimer.h>
 #include <lcdutils.h>
@@ -16,77 +17,51 @@
 
 #define GREEN_LED BIT6
 
+/** Moving Layer
+ *  Linked list of layer references
+ *  Velocity represents one iteration of change (direction & magnitude)
+ */
+ 
+typedef struct MovLayer_s {
+  Layer *layer;
+  Vec2 velocity;
+  struct MovLayer_s *next;
+} MovLayer;
 
-AbRect rect10 = {abRectGetBounds, abRectCheck, {10,10}}; /**< 10x10 rectangle */
-AbRect pongBar = {abRectGetBounds, abRectCheck, {14,3}};
-AbRArrow rightArrow = {abRArrowGetBounds, abRArrowCheck, 30};
-
-static int leftPongBarYPosition = 0;
-static int rightPongBarYPosition = 0;
+AbRect rect10 = {abRectGetBounds, abRectCheck, {10,10}}; // 10x10 rectangle 
+AbRArrow rightArrow = {abRArrowGetBounds, abRArrowCheck, 30}; // A Right Arrow 
+AbRect pongBar = {abRectGetBounds, abRectCheck, {14,3}}; // Bars for Pong
 
 AbRectOutline fieldOutline = {	/* playing field */
   abRectOutlineGetBounds, abRectOutlineCheck,   
   {screenWidth/2 - 3, screenHeight/2 - 1}
 };
 
-Layer leftPongBar = {
-  (AbShape *)&pongBar,
-  {(screenWidth/2), 30},
-  {0,0}, {0,0},
-  COLOR_BLACK,
-  0
-};
-
-Layer rightPongBar = {
-(AbShape *)&pongBar,
-  {(screenWidth/2), screenHeight-30},
-  {0,0}, {0,0},
-  COLOR_BLACK,
-  &leftPongBar
-};
-
-/*
-Layer testLayer = {
-  (AbShape *)&pongBar,
-  {(screenWidth/2), (screenHeight/2)},
-  {0,0}, {0,0},
-  COLOR_BLACK,
-  &rightPongBar
-};
-*/
-
-Layer layer4 = {
-  (AbShape *)&rightArrow,
-  {(screenWidth/2)+10, (screenHeight/2)+5}, /**< bit below & right of center */
-  {0,0}, {0,0},				    /* last & next pos */
-  COLOR_PINK,
-  &rightPongBar
-};
-  
-
-Layer layer3 = {		/**< Layer with an orange circle */
-  (AbShape *)&circle8,
-  {(screenWidth/2)+10, (screenHeight/2)+5}, /**< bit below & right of center */
-  {0,0}, {0,0},				    /* last & next pos */
-  COLOR_VIOLET,
-  &layer4,
-};
-
+static int topPongBarXPosition = 0;
+static int bottomPongBarXPosition = 0;
 
 Layer fieldLayer = {		/* playing field as a layer */
   (AbShape *) &fieldOutline,
   {screenWidth/2, screenHeight/2},/**< center */
   {0,0}, {0,0},				    /* last & next pos */
   COLOR_BLACK,
-  &rightPongBar
+  0
 };
 
-Layer layer1 = {		/**< Layer with a red square */
-  (AbShape *)&rect10,
-  {screenWidth/2, screenHeight/2}, /**< center */
-  {0,0}, {0,0},				    /* last & next pos */
-  COLOR_RED,
-  &fieldLayer,
+Layer topPongBar = {
+  (AbShape *)&pongBar,
+  {(screenWidth/2), 30},
+  {0,0}, {0,0},
+  COLOR_BLACK,
+  &fieldLayer
+};
+
+Layer bottomPongBar = {
+(AbShape *)&pongBar,
+  {(screenWidth/2), screenHeight-30},
+  {0,0}, {0,0},
+  COLOR_BLACK,
+  &topPongBar
 };
 
 Layer layer0 = {		/**< Layer with an orange circle */
@@ -94,27 +69,15 @@ Layer layer0 = {		/**< Layer with an orange circle */
   {(screenWidth/2)+10, (screenHeight/2)+5}, /**< bit below & right of center */
   {0,0}, {0,0},				    /* last & next pos */
   COLOR_ORANGE,
-  &fieldLayer,
+  &bottomPongBar,
 };
-
-/** Moving Layer
- *  Linked list of layer references
- *  Velocity represents one iteration of change (direction & magnitude)
- */
-typedef struct MovLayer_s {
-  Layer *layer;
-  Vec2 velocity;
-  struct MovLayer_s *next;
-} MovLayer;
 
 /* initial value of {0,0} will be overwritten */
 //MovLayer mTestLayer = { &testLayer, {4,4}, 0};
 
-MovLayer mLeftPongBar = { &leftPongBar, {1,1}, 0 };
-MovLayer mRightPongBar = { &rightPongBar, {1,1}, 0 };
-MovLayer ml3 = { &layer3, {1,1}, 0}; /**< not all layers move */
-MovLayer ml1 = { &layer1, {1,2}, &ml3 }; 
-MovLayer ml0 = { &layer0, {4,3}, 0 }; 
+MovLayer mtopPongBar = {&topPongBar, {1,1}, 0};
+MovLayer mbottomPongBar = {&bottomPongBar, {1,1}, 0};
+MovLayer ml0 = {&layer0, {4,3}, 0}; 
 
 movLayerDraw(MovLayer *movLayers, Layer *layers)
 {
@@ -128,7 +91,6 @@ movLayerDraw(MovLayer *movLayers, Layer *layers)
     l->pos = l->posNext;
   }
   or_sr(8);			/**< disable interrupts (GIE on) */
-
 
   for (movLayer = movLayers; movLayer; movLayer = movLayer->next) { /* for each moving layer */
     Region bounds;
@@ -153,8 +115,6 @@ movLayerDraw(MovLayer *movLayers, Layer *layers)
   } // for moving layer being updated
 }	  
 
-
-
 //Region fence = {{10,30}, {SHORT_EDGE_PIXELS-10, LONG_EDGE_PIXELS-10}}; /**< Create a fence region */
 
 /** Advances a moving shape within a fence
@@ -162,70 +122,39 @@ movLayerDraw(MovLayer *movLayers, Layer *layers)
  *  \param ml The moving shape to be advanced
  *  \param fence The region which will serve as a boundary for ml
  */
-void mlAdvance(MovLayer *ml, Region *fence, Region *leftPongBarFence, Region *rightPongBarFence)
+ 
+void mlAdvance(MovLayer *ml, Region *fence, Region *topPongBarFence, Region *bottomPongBarFence)
 {
   Vec2 newPos;
   u_char axis;
   Region shapeBoundary;
+  
   for (; ml; ml = ml->next) {
     vec2Add(&newPos, &ml->layer->posNext, &ml->velocity);
     abShapeGetBounds(ml->layer->abShape, &newPos, &shapeBoundary);
-    //leftPongBar.pos.axes[0] += 10;
-    //leftPongBar.pos.axes[1] += 10;
-    //rightPongBar.pos.axes[0] -= 10;
-    //rightPongBar.pos.axes[1] -= 10;
     for (axis = 0; axis < 2; axis ++) { 
-      if ((shapeBoundary.topLeft.axes[axis] < fence->topLeft.axes[axis]) ||
-	  (shapeBoundary.botRight.axes[axis] > fence->botRight.axes[axis]) ) {
-	int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
-	newPos.axes[axis] += (2*velocity);
-       
+      if ( (shapeBoundary.topLeft.axes[axis] < fence->topLeft.axes[axis]) || (shapeBoundary.botRight.axes[axis] > fence->botRight.axes[axis])){
+	    int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
+	    newPos.axes[axis] += (2*velocity);
       }   /**< if outside of fence */
-      if (/*(shapeBoundary.topLeft.axes[axis] == mLeftPongBar.layer->pos.axes[axis]) ||*/
-	  /*shapeBoundary.botRight.axes[axis] == */detectCollisionRight(&pongBar, &(leftPongBar.pos), &(ml->layer->pos))) {
-	if (axis == 1){
-	int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
-	
-	newPos.axes[axis] += (2*velocity);
-	}
+      if (detectCollisionTop(&pongBar, &(topPongBar.pos), &(ml->layer->pos))){
+	    if (axis == 1){
+	      int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
+	      newPos.axes[axis] += (2*velocity);
+	    }
       }
-      if (/*(shapeBoundary.topLeft.axes[axis] == mRightPongBar.layer->pos.axes[axis]) ||
-	    (shapeBoundary.botRight.axes[axis] == mRightPongBar.layer->pos.axes[axis])*/ detectCollisionLeft(&pongBar, &(rightPongBar.pos), &(ml->layer->pos))) {
+      if (detectCollisionBottom(&pongBar, &(bottomPongBar.pos), &(ml->layer->pos))){
         if (axis == 1){
-	int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
-	
-	newPos.axes[axis] += (2*velocity);
-	}
+	      int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
+	      newPos.axes[axis] += (2*velocity);
+	    }
       }
-    } /**< for axis */
+    } 
     ml->layer->posNext = newPos;
-    //leftPongBar.pos.axes[0] -= 10;
-    //leftPongBar.pos.axes[1] -= 10;
-    //rightPongBar.pos.axes[0] += 10;
-    //rightPongBar.pos.axes[1] += 10;
-  } /**< for ml */
-  
+  } 
 }
 
-int detectCollisionLeft(const AbRect* rect, const Vec2* centerPos, const Vec2 *pixel){
-
-  int i = 0;
-  Vec2 centerPos1 = *centerPos;
-  for (i = -8; i < 8; i++){
-    centerPos1.axes[0] += i;
-    centerPos1.axes[1] -= 10;
-    int collision = abRectCheck(rect, &centerPos1, pixel);
-    if (collision){
-      return 1;
-    }
-    centerPos1.axes[0] -= i;
-    centerPos1.axes[1] += 10;
-  }
-  return 0;
-  
-}
-int detectCollisionRight(const AbRect* rect, const Vec2* centerPos, const Vec2 *pixel){
-
+int detectCollisionTop(const AbRect* rect, const Vec2* centerPos, const Vec2 *pixel){
   int i = 0;
   Vec2 centerPos1 = *centerPos;
   for (i = -8; i < 8; i++){
@@ -239,55 +168,62 @@ int detectCollisionRight(const AbRect* rect, const Vec2* centerPos, const Vec2 *
     centerPos1.axes[1] -= 10;
   }
   return 0;
-  
 }
 
-void movLeftPongBar(int switches){
+int detectCollisionBottom(const AbRect* rect, const Vec2* centerPos, const Vec2 *pixel){
+  int i = 0;
+  Vec2 centerPos1 = *centerPos;
+  for (i = -8; i < 8; i++){
+    centerPos1.axes[0] += i;
+    centerPos1.axes[1] -= 10;
+    int collision = abRectCheck(rect, &centerPos1, pixel);
+    if (collision){
+      return 1;
+    }
+    centerPos1.axes[0] -= i;
+    centerPos1.axes[1] += 10;
+  }
+  return 0;
+}
 
-    mLeftPongBar.layer->posNext.axes[0] = mLeftPongBar.layer->pos.axes[0] + leftPongBarYPosition;
-    //int switches = p2sw_read();
-    //int switches1 = switches & BIT0;
-    //int switches2 = switches & BIT1;
+void movtopPongBar(int switches){
+    mtopPongBar.layer->posNext.axes[0] = mtopPongBar.layer->pos.axes[0] + topPongBarXPosition;
     if (!(BIT0&switches)){
-      if (mLeftPongBar.layer->pos.axes[0] >= 20){
-	leftPongBarYPosition = -5;
+      if (mtopPongBar.layer->pos.axes[0] >= 20){
+	topPongBarXPosition = -5;
       } else {
-	leftPongBarYPosition = 0;
+	topPongBarXPosition = 0;
       }
     } else if (!(BIT1 & switches)){
-      if (mLeftPongBar.layer->pos.axes[0] <= screenWidth - 20){
-	leftPongBarYPosition = 5;
+      if (mtopPongBar.layer->pos.axes[0] <= screenWidth - 20){
+	topPongBarXPosition = 5;
       }  else {
-	leftPongBarYPosition = 0;
+	topPongBarXPosition = 0;
       }
     } else {
-	leftPongBarYPosition = 0;
+	topPongBarXPosition = 0;
     }
-    movLayerDraw(&mLeftPongBar, &leftPongBar);
+    movLayerDraw(&mtopPongBar, &topPongBar);
 }
 
-void movRightPongBar(int switches){
-
-    mRightPongBar.layer->posNext.axes[0] = mRightPongBar.layer->pos.axes[0] + rightPongBarYPosition;
-    //int switches = p2sw_read();
-    //int switches1 = switches & BIT0;
-    //int switches2 = switches & BIT1;
+void movbottomPongBar(int switches){
+    mbottomPongBar.layer->posNext.axes[0] = mbottomPongBar.layer->pos.axes[0] + bottomPongBarXPosition;
     if (!(BIT2 &switches)){
-      if (mRightPongBar.layer->pos.axes[0] >= 20){
-	rightPongBarYPosition = -10;
+      if (mbottomPongBar.layer->pos.axes[0] >= 20){
+	    bottomPongBarXPosition = -10;
       } else {
-	rightPongBarYPosition = 0;
+	    bottomPongBarXPosition = 0;
       }
     } else if (!(BIT3 & switches)){
-      if (mRightPongBar.layer->pos.axes[0] <= screenWidth - 20){
-	rightPongBarYPosition = 10;
+      if (mbottomPongBar.layer->pos.axes[0] <= screenWidth - 20){
+	    bottomPongBarXPosition = 10;
       }  else {
-	rightPongBarYPosition = 0;
+	    bottomPongBarXPosition = 0;
       }
     } else {
-	rightPongBarYPosition = 0;
+	    bottomPongBarXPosition = 0;
     }
-    movLayerDraw(&mRightPongBar, &rightPongBar);
+    movLayerDraw(&mbottomPongBar, &bottomPongBar);
 }
 
 
@@ -295,9 +231,8 @@ u_int bgColor = COLOR_BLUE;     /**< The background color */
 int redrawScreen = 1;           /**< Boolean for whether screen needs to be redrawn */
 
 Region fieldFence;		/**< fence around playing field  */
-Region leftPongBarFence;
-Region rightPongBarFence;
-
+Region topPongBarFence;
+Region bottomPongBarFence;
 
 /** Initializes everything, enables interrupts and green LED, 
  *  and handles the rendering for the screen
@@ -316,20 +251,13 @@ void main()
 
   layerInit(&layer0);
   layerDraw(&layer0);
-  // layerInit(&leftPongBar);
-  //layerDraw(&leftPongBar);
 
-
-  //layerGetBounds(&fieldLayer, &fieldFence);
-   layerGetBounds(&fieldLayer, &fieldFence); 
-   layerGetBounds(&leftPongBar,&leftPongBarFence); 
-   layerGetBounds(&rightPongBar,&rightPongBarFence);
+  layerGetBounds(&fieldLayer, &fieldFence); 
+  layerGetBounds(&topPongBar,&topPongBarFence); 
+  layerGetBounds(&bottomPongBar,&bottomPongBarFence);
    
   enableWDTInterrupts();      /**< enable periodic interrupt */
   or_sr(0x8);	              /**< GIE (enable interrupts) */
-
-  
-  
 
   for(;;) { 
     while (!redrawScreen) { /**< Pause CPU if screen doesn't need updating */
@@ -338,19 +266,9 @@ void main()
     }
     P1OUT |= GREEN_LED;       /**< Green led on when CPU on */
     redrawScreen = 0;
-    /*
-    mLeftPongBar.layer->posNext.axes[1] = mLeftPongBar.layer->pos.axes[1] + leftPongBarYPosition;
     int switches = p2sw_read();
-    if (!switches){
-      leftPongBarYPosition -= 10;
-    } else {
-      leftPongBarYPosition = 0;
-    }
-    */
-    int switches = p2sw_read();
-    movLeftPongBar(switches);
-       movRightPongBar(switches);
-    //movLayerDraw(&mLeftPongBar, &leftPongBar);
+    movtopPongBar(switches);
+    movbottomPongBar(switches);
     movLayerDraw(&ml0, &layer0);
   }
 }
@@ -362,7 +280,7 @@ void wdt_c_handler()
   P1OUT |= GREEN_LED;		      /**< Green LED on when cpu on */
   count ++;
   if (count == 15) {
-    mlAdvance(&ml0, &fieldFence, &leftPongBarFence, &rightPongBarFence);
+    mlAdvance(&ml0, &fieldFence, &topPongBarFence, &bottomPongBarFence);
     //if (p2sw_read())
       redrawScreen = 1;
     count = 0;
