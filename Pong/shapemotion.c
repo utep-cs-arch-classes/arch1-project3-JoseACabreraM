@@ -39,7 +39,8 @@ AbRectOutline fieldOutline = {	/* playing field */
 
 static int topPongBarXPosition = 0;
 static int bottomPongBarXPosition = 0;
-
+static char playerOneScore = '0';
+static char playerTwoScore = '0';
 Layer fieldLayer = {		/* playing field as a layer */
   (AbShape *) &fieldOutline,
   {screenWidth/2, screenHeight/2},/**< center */
@@ -77,7 +78,7 @@ Layer layer0 = {		/**< Layer with an orange circle */
 
 MovLayer mtopPongBar = {&topPongBar, {1,1}, 0};
 MovLayer mbottomPongBar = {&bottomPongBar, {1,1}, 0};
-MovLayer ml0 = {&layer0, {3,2}, 0}; 
+MovLayer ml0 = {&layer0, {4,3}, 0}; 
 
 movLayerDraw(MovLayer *movLayers, Layer *layers)
 {
@@ -135,8 +136,22 @@ void mlAdvance(MovLayer *ml, Region *fence, Region *topPongBarFence, Region *bot
     for (axis = 0; axis < 2; axis++) {
       // If the ball hits the fence
       if ((shapeBoundary.topLeft.axes[axis] < fence->topLeft.axes[axis]) || (shapeBoundary.botRight.axes[axis] > fence->botRight.axes[axis])){
-	    int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
-	    newPos.axes[axis] += (2*velocity);
+	if(detectCollisionTopFence(&fieldOutline, &(fieldLayer.pos), &(ml->layer->pos)) && axis == 1){
+	  newPos.axes[axis] = (screenHeight/2)+5;
+	  newPos.axes[0] = (screenWidth/2)+10;
+	  ml->velocity.axes[0] = 4;
+	  ml->velocity.axes[1] = 3;
+	  playerOneScore++;
+	} else if(detectCollisionBottomFence(&fieldOutline, &(fieldLayer.pos), &(ml->layer->pos)) && axis == 1){
+          newPos.axes[axis] = (screenHeight/2)+5;
+	  newPos.axes[0] = (screenWidth/2)+10;
+	  ml->velocity.axes[0] = 4;
+	  ml->velocity.axes[1] = 3;
+	  playerTwoScore++;
+	} else {
+	int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
+        newPos.axes[axis] += (2*velocity);
+	}
       }
       // If the ball hits the top pong bar, only checking on the Y-Axis 
       if (detectCollisionTop(&pongBar, &(topPongBar.pos), &(ml->layer->pos)) && axis == 1){
@@ -153,10 +168,41 @@ void mlAdvance(MovLayer *ml, Region *fence, Region *topPongBarFence, Region *bot
   }
 }
 
+int detectCollisionTopFence(const AbRect* rect, const Vec2* centerPos, const Vec2 *pixel){
+  int i = 0;
+  Vec2 centerPos1 = *centerPos;
+  for (i = -100; i < 100; i++){
+    centerPos1.axes[0] += i;
+    centerPos1.axes[1] += 50;
+    int collision = abRectCheck(rect, &centerPos1, pixel);
+    if (collision){
+      return 1;
+    }
+    centerPos1.axes[0] -= i;
+    centerPos1.axes[1] -= 50;
+  }
+  return 0;
+}
+int detectCollisionBottomFence(const AbRect* rect, const Vec2* centerPos, const Vec2 *pixel){
+  int i = 0;
+  Vec2 centerPos1 = *centerPos;
+  for (i = -100; i < 100; i++){
+    centerPos1.axes[0] += i;
+    centerPos1.axes[1] -= 50;
+    int collision = abRectCheck(rect, &centerPos1, pixel);
+    if (collision){
+      return 1;
+    }
+    centerPos1.axes[0] -= i;
+    centerPos1.axes[1] += 50;
+  }
+  return 0;
+}
+
 int detectCollisionTop(const AbRect* rect, const Vec2* centerPos, const Vec2 *pixel){
   int i = 0;
   Vec2 centerPos1 = *centerPos;
-  for (i = -7; i < 7; i++){
+  for (i = -6; i < 6; i++){
     centerPos1.axes[0] += i;
     centerPos1.axes[1] += 10;
     int collision = abRectCheck(rect, &centerPos1, pixel);
@@ -172,7 +218,7 @@ int detectCollisionTop(const AbRect* rect, const Vec2* centerPos, const Vec2 *pi
 int detectCollisionBottom(const AbRect* rect, const Vec2* centerPos, const Vec2 *pixel){
   int i = 0;
   Vec2 centerPos1 = *centerPos;
-  for (i = -7; i < 7; i++){
+  for (i = -6; i < 6; i++){
     centerPos1.axes[0] += i;
     centerPos1.axes[1] -= 10;
     int collision = abRectCheck(rect, &centerPos1, pixel);
@@ -209,13 +255,13 @@ void movbottomPongBar(int switches){
     mbottomPongBar.layer->posNext.axes[0] = mbottomPongBar.layer->pos.axes[0] + bottomPongBarXPosition;
     if (!(BIT2 &switches)){
       if (mbottomPongBar.layer->pos.axes[0] >= 20){
-	    bottomPongBarXPosition = -10;
+	    bottomPongBarXPosition = -5;
       } else {
 	    bottomPongBarXPosition = 0;
       }
     } else if (!(BIT3 & switches)){
       if (mbottomPongBar.layer->pos.axes[0] <= screenWidth - 20){
-	    bottomPongBarXPosition = 10;
+	    bottomPongBarXPosition = 5;
       }  else {
 	    bottomPongBarXPosition = 0;
       }
@@ -265,8 +311,17 @@ void main()
     }
     P1OUT |= GREEN_LED;       /**< Green led on when CPU on */
     redrawScreen = 0;
-    drawString5x7(7, 5, "Player 1", COLOR_WHITE, COLOR_BLUE);
-    drawString5x7(screenWidth/2 + 10, screenHeight-10, "Player 2", COLOR_WHITE, COLOR_BLUE);
+    drawString5x7(7, 5, "Player 1 - ", COLOR_WHITE, COLOR_BLUE);
+    drawString5x7(screenWidth/2 -2, screenHeight-10, "- Player 2", COLOR_WHITE, COLOR_BLUE);
+    
+    drawChar5x7(75, 5, playerOneScore, COLOR_WHITE, COLOR_BLUE);
+    drawChar5x7(screenWidth/2 - 10, screenHeight-10, playerTwoScore, COLOR_WHITE, COLOR_BLUE);
+
+    if (playerOneScore == '9' || playerTwoScore == '9'){
+      drawString5x7(75, 75, "Pudrete", COLOR_WHITE, COLOR_BLUE);
+      break;
+    }
+    
     int switches = p2sw_read();
     movtopPongBar(switches);
     movbottomPongBar(switches);
