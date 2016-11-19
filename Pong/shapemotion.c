@@ -174,7 +174,8 @@ void mlAdvance(MovLayer *ml, Region *fence, Region *topPongBarFence, Region *bot
   Vec2 newPos;
   u_char axis;
   Region shapeBoundary;
-  
+  CCR0 = 0;
+  CCR1 = 0 >> 1;
   for (; ml; ml = ml->next) {
     vec2Add(&newPos, &ml->layer->posNext, &ml->velocity);
     abShapeGetBounds(ml->layer->abShape, &newPos, &shapeBoundary);
@@ -211,6 +212,8 @@ void mlAdvance(MovLayer *ml, Region *fence, Region *topPongBarFence, Region *bot
 	incrementBallVelocity(ml);
 	collisionBottomOccurred = 0;
 	collisionTopOccured = 1;
+	CCR0 = 2000;
+	CCR1 = 2000 >> 1;
       }
       // If the ball hits the bottom pong bar, only checking on the Y-Axis
       if (detectCollisionBottom(&pongBar, &(bottomPongBar.pos), &(ml->layer->pos)) && axis == 1){
@@ -219,6 +222,8 @@ void mlAdvance(MovLayer *ml, Region *fence, Region *topPongBarFence, Region *bot
 	incrementBallVelocity(ml);
 	collisionBottomOccurred = 1;
 	collisionTopOccured = 0;
+	CCR0 = 2000;
+	CCR1 = 2000 >> 1;
       }
     } 
     ml->layer->posNext = newPos;
@@ -362,6 +367,7 @@ void main()
   shapeInit();
   p2sw_init(BIT0 + BIT1 + BIT2 + BIT3);
 
+  timerAUpmode();
   P2SEL &= ~(BIT6 | BIT7);
   P2SEL &= ~BIT7;
   P2SEL |= BIT6;
