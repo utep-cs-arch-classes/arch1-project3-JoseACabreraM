@@ -362,29 +362,37 @@ void movbottomPongBar(int switches){
     movLayerDraw(&mbottomPongBar, &bottomPongBar);
 }
 
-
+void initializeBuzzer(){
+  timerAUpmode();
+  P2SEL &= ~(BIT6 | BIT7);
+  P2SEL &= ~BIT7;
+  P2SEL |= BIT6;
+  P2DIR = BIT6;
+}
 
 u_int bgColor = COLOR_BLACK;     /**< The background color */
 int redrawScreen = 1;           /**< Boolean for whether screen needs to be redrawn */
 
-static int gameResetCounter = 0;
-static int modeSelector = 0;
-static char* winner;
-int switches;
+static int modeSelector = 0; // To Determine Current Game State
+static char* winner; // To Print Out A Winner When Game Ends
+int switches; // To Read Input From Switches
  
-Region fieldFence;		/**< fence around playing field  */
+Region fieldFence;		// Fence Around Playing Field  
 Region topPongBarFence;
 Region bottomPongBarFence;
 
 void selectMode(){
+  // To Keep Game From Starting While In A Menu Screen
   layerInit(&layer0);
+  // Menu Screen, Lets User Set Difficulty Mode And Start Game 
   if (modeSelector == 0){
     drawString5x7(15, 40, "    PONG", COLOR_WHITE, COLOR_BLACK);
     drawString5x7(15, 60, "BTN1 - Start", COLOR_WHITE, COLOR_BLACK);
     drawString5x7(15, 80, "BTN2 - Set Easy", COLOR_WHITE, COLOR_BLACK);
     drawString5x7(15, 100, "BTN3 - Set Medium", COLOR_WHITE, COLOR_BLACK);
     drawString5x7(15, 120, "BTN4 - Set Hard", COLOR_WHITE, COLOR_BLACK);
-    if (!(BIT0 & switches)) {
+    // Starts The Game 
+	if (!(BIT0 & switches)) { 
       clearScreen(0);
       _delay(50);
       layerInit(&layer0);
@@ -393,16 +401,22 @@ void selectMode(){
       playerTwoScore = '0';
       playerOneScore = '0';
       modeSelector = 1;
-    } else if (!(BIT1 & switches)){
+    } 
+	// Sets Easy Difficulty Mode
+	else if (!(BIT1 & switches)){
       difficultyMode = -4;
-    } else if (!(BIT2 & switches)){
+    } 
+	// Sets Medium Difficulty Mode
+	else if (!(BIT2 & switches)){
       difficultyMode = 0;
-    } else if (!(BIT3 & switches)){
+    }
+	// Sets Hard Difficulty Mode	
+	else if (!(BIT3 & switches)){
       difficultyMode = 4;
     }
   }
+  // Game Over Screen, Displays Winner And Lets User Restart The Game
   if (modeSelector == 2){
-    //drawString5x7(15, 60, "", COLOR_WHITE, COLOR_BLACK);
     drawString5x7(7, 5, "Player 1 - ", COLOR_WHITE, COLOR_BLACK);
     drawString5x7(screenWidth/2 - 2, screenHeight-10, "- Player 2", COLOR_WHITE, COLOR_BLACK);
     drawChar5x7(75, 5, playerOneScore, COLOR_WHITE, COLOR_BLACK);
@@ -410,16 +424,14 @@ void selectMode(){
     drawString5x7(10, 60, "  Game Over", COLOR_WHITE, COLOR_BLACK);
     drawString5x7(15, 80, winner, COLOR_WHITE, COLOR_BLACK);
     drawString5x7(15, 100, " BTN1 - Menu", COLOR_WHITE, COLOR_BLACK);
-    
+	// Restart Game 
     if (!(BIT0 & switches)) {
       clearScreen(0);
       difficultyMode = 0;
       modeSelector = 0;
       _delay(50);
-    }
-    
+    } 
   }
-  
 }
 
 /** Initializes everything, enables interrupts and green LED, 
@@ -434,12 +446,7 @@ void main()
   lcd_init();
   //shapeInit();
   p2sw_init(BIT0 + BIT1 + BIT2 + BIT3);
-
-  timerAUpmode();
-  P2SEL &= ~(BIT6 | BIT7);
-  P2SEL &= ~BIT7;
-  P2SEL |= BIT6;
-  P2DIR = BIT6;
+  initializeBuzzer
 
   clearScreen(0);
   shapeInit();
@@ -454,44 +461,45 @@ void main()
   or_sr(0x8);	              /**< GIE (enable interrupts) */
 
   for(;;) {
-    switches = p2sw_read();
+    // To Read Input From Switches
+	switches = p2sw_read();
+	// Game Only Starts When modeSelector Is 1, Otherwise A Menu Is Being Displayed 
     if (modeSelector != 1){
       selectMode();
     } else {
+		
       while (!redrawScreen) { /**< Pause CPU if screen doesn't need updating */
-	P1OUT &= ~GREEN_LED;    /**< Green led off witHo CPU */
-	or_sr(0x10);	      /**< CPU OFF */
+		P1OUT &= ~GREEN_LED;    /**< Green led off witHo CPU */
+	    or_sr(0x10);	      /**< CPU OFF */
       }
-
-      P1OUT |= GREEN_LED;       /**< Green led on when CPU on */
+	  // Turns On The Green LED When CPU Is On
+      P1OUT |= GREEN_LED;      
       redrawScreen = 0;
-    
+	  // Draws The Player's Name In A Corresponding Corner
       drawString5x7(7, 5, "Player 1 - ", COLOR_WHITE, COLOR_BLACK);
       drawString5x7(screenWidth/2 -2, screenHeight-10, "- Player 2", COLOR_WHITE, COLOR_BLACK);
-      
+	  // Checks Wether The Pong Bars Should Be Moved
       movtopPongBar(switches);
       movbottomPongBar(switches);
+	  // Moves The Ball
       movLayerDraw(&ml0, &layer0);
-
+	  // Checks If Either Player Has Scored 10 Times And Terminates The Game
       if (playerOneScore == ':' || playerTwoScore == ':'){
-	//drawString5x7(7, 5, "Player 1 - ", COLOR_WHITE, COLOR_BLACK);
-	//drawString5x7(screenWidth/2 -2, screenHeight-10, "- Player 2", COLOR_WHITE, COLOR_BLACK);
-	//drawChar5x7(75, 5, playerOneScore, COLOR_WHITE, COLOR_BLACK);
-	//drawChar5x7(screenWidth/2 - 10, screenHeight-10, playerTwoScore, COLOR_WHITE, COLOR_BLACK);
-	//drawString5x7(60, 60, "Game Over", COLOR_WHITE, COLOR_BLACK);
-	if (playerOneScore == ':'){
-	  winner = "Player 1 Won!";
-	  playerOneScore = 'W';
-	} else {
-	  winner = "Player 2 Won!";
-	  playerTwoScore = 'W';
-	}
-	modeSelector = 2;
-	clearScreen(0);
+	    if (playerOneScore == ':'){
+	      winner = "Player 1 Won!";
+	      playerOneScore = 'W';
+	    } else {
+	      winner = "Player 2 Won!";
+	      playerTwoScore = 'W';
+	    }
+	    modeSelector = 2;
+	    clearScreen(0);
       }
+	  // Draws The Player's Current Score
       drawChar5x7(75, 5, playerOneScore, COLOR_WHITE, COLOR_BLACK);
       drawChar5x7(screenWidth/2 - 15, screenHeight-10, playerTwoScore, COLOR_WHITE, COLOR_BLACK);
     }
+	
   }
 }
 
