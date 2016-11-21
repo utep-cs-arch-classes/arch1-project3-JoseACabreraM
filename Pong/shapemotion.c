@@ -195,7 +195,7 @@ void handleCollisionOnBar(){
  *  \param fence The region which will serve as a boundary for ml
  */
  
-void mlAdvance(MovLayer *ml, Region *fence, Region *topPongBarFence, Region *bottomPongBarFence)
+void mlAdvance(MovLayer *ml, Region *fence)
 {
   Vec2 newPos;
   u_char axis;
@@ -206,19 +206,16 @@ void mlAdvance(MovLayer *ml, Region *fence, Region *topPongBarFence, Region *bot
   for (; ml; ml = ml->next) {
     vec2Add(&newPos, &ml->layer->posNext, &ml->velocity);
     abShapeGetBounds(ml->layer->abShape, &newPos, &shapeBoundary);
-
     for (axis = 0; axis < 2; axis++) {
       // If the ball hits the fence
       if ((shapeBoundary.topLeft.axes[axis] < fence->topLeft.axes[axis]) || (shapeBoundary.botRight.axes[axis] > fence->botRight.axes[axis])){
-	if(detectCollisionTopFence(&fieldOutline, &(fieldLayer.pos), &(ml->layer->pos)) && axis == 1){
+	if (detectCollisionTopFence(&fieldOutline, &(fieldLayer.pos), &(ml->layer->pos)) && axis == 1){
 	  handleCollisionOnFence(&newPos, ml);
 	  playerTwoScore++;
-	  //playerTwoScore %= ':';
-	} else if(detectCollisionBottomFence(&fieldOutline, &(fieldLayer.pos), &(ml->layer->pos)) && axis == 1){
+	} else if (detectCollisionBottomFence(&fieldOutline, &(fieldLayer.pos), &(ml->layer->pos)) && axis == 1){
 	  handleCollisionOnFence(&newPos, ml);
 	  playerOneScore++;
-	  //playerOneScore %= ':';
-	} else { 
+    	} else { 
 	  int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
 	  newPos.axes[axis] += (2*velocity);
 	}
@@ -242,12 +239,10 @@ void mlAdvance(MovLayer *ml, Region *fence, Region *topPongBarFence, Region *bot
 	playCollisionSound();
       }
     }
-    
+    // Sets The Ball's Next Position
     ml->layer->posNext = newPos;
   }
 }
-
-
 
 int detectCollisionBottomFence(const AbRect* rect, const Vec2* centerPos, const Vec2 *pixel){
   int i = 0;
@@ -379,12 +374,8 @@ static char* winner; // To Print Out A Winner When Game Ends
 int switches; // To Read Input From Switches
  
 Region fieldFence;		// Fence Around Playing Field  
-Region topPongBarFence;
-Region bottomPongBarFence;
 
 void selectMode(){
-  // To Keep Game From Starting While In A Menu Screen
-  //layerInit(&layer0);
   // Menu Screen, Lets User Set Difficulty Mode And Start Game 
   if (modeSelector == 0){
     drawString5x7(15, 40, "    PONG", COLOR_WHITE, COLOR_BLACK);
@@ -392,27 +383,24 @@ void selectMode(){
     drawString5x7(15, 80, "BTN2 - Set Easy", COLOR_WHITE, COLOR_BLACK);
     drawString5x7(15, 100, "BTN3 - Set Medium", COLOR_WHITE, COLOR_BLACK);
     drawString5x7(15, 120, "BTN4 - Set Hard", COLOR_WHITE, COLOR_BLACK);
-    // Starts The Game 
-	if (!(BIT0 & switches)) { 
+    // Starts The Game
+    if (!(BIT0 & switches)) { 
       clearScreen(0);
       _delay(50);
-      //layerInit(&layer0);
-      //ml0.velocity.axes[0] = 2;
-      //ml0.velocity.axes[1] = 1;
       playerTwoScore = '6';
       playerOneScore = '6';
       modeSelector = 1;
-    } 
-	// Sets Easy Difficulty Mode
-	else if (!(BIT1 & switches)){
+    }
+    // Sets Easy Difficulty Mode
+    else if (!(BIT1 & switches)){
       difficultyMode = -4;
-    } 
-	// Sets Medium Difficulty Mode
-	else if (!(BIT2 & switches)){
+    }
+    // Sets Medium Difficulty Mode
+    else if (!(BIT2 & switches)){
       difficultyMode = 0;
     }
-	// Sets Hard Difficulty Mode	
-	else if (!(BIT3 & switches)){
+    // Sets Hard Difficulty Mode
+    else if (!(BIT3 & switches)){
       difficultyMode = 4;
     }
   }
@@ -425,7 +413,7 @@ void selectMode(){
     drawString5x7(10, 60, "  Game Over", COLOR_WHITE, COLOR_BLACK);
     drawString5x7(15, 80, winner, COLOR_WHITE, COLOR_BLACK);
     drawString5x7(15, 100, " BTN1 - Menu", COLOR_WHITE, COLOR_BLACK);
-	// Restart Game 
+    // Restart Game 
     if (!(BIT0 & switches)) {
       clearScreen(0);
       difficultyMode = 0;
@@ -447,7 +435,7 @@ void main()
   lcd_init();
   //shapeInit();
   p2sw_init(BIT0 + BIT1 + BIT2 + BIT3);
-  initializeBuzzer
+  initializeBuzzer();
 
   clearScreen(0);
   shapeInit();
@@ -455,16 +443,14 @@ void main()
   //layerDraw(&layer0);
 
   layerGetBounds(&fieldLayer, &fieldFence); 
-  layerGetBounds(&topPongBar,&topPongBarFence); 
-  layerGetBounds(&bottomPongBar,&bottomPongBarFence);
    
   enableWDTInterrupts();      /**< enable periodic interrupt */
   or_sr(0x8);	              /**< GIE (enable interrupts) */
 
   for(;;) {
     // To Read Input From Switches
-	switches = p2sw_read();
-	// Game Only Starts When modeSelector Is 1, Otherwise A Menu Is Being Displayed 
+    switches = p2sw_read();
+    // Game Only Starts When modeSelector Is 1, Otherwise A Menu Is Being Displayed 
     if (modeSelector != 1){
       selectMode();
     } else {
@@ -473,18 +459,18 @@ void main()
 		P1OUT &= ~GREEN_LED;    /**< Green led off witHo CPU */
 	    or_sr(0x10);	      /**< CPU OFF */
       }
-	  // Turns On The Green LED When CPU Is On
+      // Turns On The Green LED When CPU Is On
       P1OUT |= GREEN_LED;      
       redrawScreen = 0;
-	  // Draws The Player's Name In A Corresponding Corner
+      // Draws The Player's Name In A Corresponding Corner
       drawString5x7(7, 5, "Player 1 - ", COLOR_WHITE, COLOR_BLACK);
       drawString5x7(screenWidth/2 -2, screenHeight-10, "- Player 2", COLOR_WHITE, COLOR_BLACK);
-	  // Checks Wether The Pong Bars Should Be Moved
+      // Checks Wether The Pong Bars Should Be Moved
       movtopPongBar(switches);
       movbottomPongBar(switches);
-	  // Moves The Ball
+      // Moves The Ball
       movLayerDraw(&ml0, &layer0);
-	  // Checks If Either Player Has Scored 10 Times And Terminates The Game
+      // Checks If Either Player Has Scored 10 Times And Terminates The Game
       if (playerOneScore == ':' || playerTwoScore == ':'){
 	    if (playerOneScore == ':'){
 	      winner = "Player 1 Won!";
@@ -496,7 +482,7 @@ void main()
 	    modeSelector = 2;
 	    clearScreen(0);
       }
-	  // Draws The Player's Current Score
+      // Draws The Player's Current Score
       drawChar5x7(75, 5, playerOneScore, COLOR_WHITE, COLOR_BLACK);
       drawChar5x7(screenWidth/2 - 15, screenHeight-10, playerTwoScore, COLOR_WHITE, COLOR_BLACK);
     }
@@ -511,9 +497,10 @@ void wdt_c_handler()
   P1OUT |= GREEN_LED;		      /**< Green LED on when cpu on */
   count ++;
   if (count == 15) {
-	if (modeSelector == 1){
-	  mlAdvance(&ml0, &fieldFence, &topPongBarFence, &bottomPongBarFence);
-	}
+    // To Keep Game From Starting During Menus
+    if (modeSelector == 1){
+      mlAdvance(&ml0, &fieldFence);
+    }
     if (p2sw_read())
       redrawScreen = 1;
     count = 0;
