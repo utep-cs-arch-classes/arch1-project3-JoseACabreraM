@@ -37,12 +37,25 @@ AbRectOutline fieldOutline = {	/* playing field */
   {screenWidth/2 - 3, screenHeight/2 - 1}
 };
 
+AbRectOutline selectorOutline = {
+  abRectOutlineGetBounds, abRectOutlineCheck,   
+  {55, 8}
+};
+
 static int topPongBarXPosition = 0;
 static int bottomPongBarXPosition = 0;
 static char playerOneScore = '6';
 static char playerTwoScore = '6';
 static int startingXSpeed = 2;
 static int startingYSpeed = 1;
+
+Layer selectorLayer = {
+  (AbShape *) &selectorOutline,
+  {65, 83},/**< center */
+  {0,0}, {0,0},				    /* last & next pos */
+  COLOR_WHITE,
+  0
+};
 
 Layer fieldLayer = {		/* playing field as a layer */
   (AbShape *) &fieldOutline,
@@ -69,7 +82,7 @@ Layer bottomPongBar = {
 };
 
 Layer layer0 = {		/**< Layer with an orange circle */
-  (AbShape *)&circle8,
+  (AbShape *)&circle7,
   {(screenWidth/2)+10, (screenHeight/2)-10}, /**< bit below & right of center */
   {0,0}, {0,0},				    /* last & next pos */
   COLOR_WHITE,
@@ -229,7 +242,7 @@ void mlAdvance(MovLayer *ml, Region *fence)
 	incrementBallVelocity(ml);
 	collisionBottomOccurred = 0;
 	collisionTopOccured = 1;
-	//playCollisionSound();
+	playCollisionSound();
       }
       // If the ball hits the bottom pong bar, only checking on the Y-Axis
       if (detectCollisionBottom(&pongBar, &(bottomPongBar.pos), &(ml->layer->pos)) && axis == 1){
@@ -238,7 +251,7 @@ void mlAdvance(MovLayer *ml, Region *fence)
 	incrementBallVelocity(ml);
 	collisionBottomOccurred = 1;
 	collisionTopOccured = 0;
-	//playCollisionSound();
+	playCollisionSound();
       }
     }
     // Sets The Ball's Next Position
@@ -323,14 +336,14 @@ int detectCollisionBottom(const AbRect* rect, const Vec2* centerPos, const Vec2 
 void movtopPongBar(int switches){
     mtopPongBar.layer->posNext.axes[0] = mtopPongBar.layer->pos.axes[0] + topPongBarXPosition;
     if (!(BIT0&switches)){
-      if (mtopPongBar.layer->posNext.axes[0] >= 30){
-	topPongBarXPosition = -12;
+      if (mtopPongBar.layer->posNext.axes[0] >= 31){
+	topPongBarXPosition = -13;
       } else {
 	topPongBarXPosition = 0;
       }
     } else if (!(BIT1 & switches)){
-      if (mtopPongBar.layer->posNext.axes[0] <= screenWidth - 30){
-	topPongBarXPosition = 12;
+      if (mtopPongBar.layer->posNext.axes[0] <= screenWidth - 31){
+	topPongBarXPosition = 13;
       }  else {
 	topPongBarXPosition = 0;
       }
@@ -343,14 +356,14 @@ void movtopPongBar(int switches){
 void movbottomPongBar(int switches){
     mbottomPongBar.layer->posNext.axes[0] = mbottomPongBar.layer->pos.axes[0] + bottomPongBarXPosition;
     if (!(BIT2 &switches)){
-      if (mbottomPongBar.layer->posNext.axes[0] >= 30){
-	    bottomPongBarXPosition = -12;
+      if (mbottomPongBar.layer->posNext.axes[0] >= 31){
+	    bottomPongBarXPosition = -13;
       } else {
 	    bottomPongBarXPosition = 0;
       }
     } else if (!(BIT3 & switches)){
-      if (mbottomPongBar.layer->posNext.axes[0] <= screenWidth - 30){
-	    bottomPongBarXPosition = 12;
+      if (mbottomPongBar.layer->posNext.axes[0] <= screenWidth - 31){
+	    bottomPongBarXPosition = 13;
       }  else {
 	    bottomPongBarXPosition = 0;
       }
@@ -359,7 +372,7 @@ void movbottomPongBar(int switches){
     }
     movLayerDraw(&mbottomPongBar, &bottomPongBar);
 }
-
+ 
 void initializeBuzzer(){
   timerAUpmode();
   P2SEL &= ~(BIT6 | BIT7);
@@ -379,6 +392,7 @@ Region fieldFence;		// Fence Around Playing Field
 
 void selectMode(){
   // Menu Screen, Lets User Set Difficulty Mode And Start Game 
+  
   if (modeSelector == 0){
     drawString5x7(15, 40, "    PONG", COLOR_WHITE, COLOR_BLACK);
     drawString5x7(15, 60, "BTN1 - Start", COLOR_WHITE, COLOR_BLACK);
@@ -389,29 +403,35 @@ void selectMode(){
     if (!(BIT0 & switches)) { 
       clearScreen(0);
       _delay(50);
-      playerTwoScore = '6';
-      playerOneScore = '6';
+      playerTwoScore = '0';
+      playerOneScore = '0';
       modeSelector = 1;
       ml0.velocity.axes[0] = startingXSpeed;
       ml0.velocity.axes[1] = startingYSpeed;
     }
     // Sets Easy Difficulty Mode
     else if (!(BIT1 & switches)){
+      selectorLayer.pos.axes[1] = 83;
+      layerDraw(&selectorLayer);
       startingXSpeed = 2;
       startingYSpeed = 1;
-      difficultyMode = -4;
+      difficultyMode = -2;
     }
     // Sets Medium Difficulty Mode
     else if (!(BIT2 & switches)){
+      selectorLayer.pos.axes[1] = 103;
+      layerDraw(&selectorLayer);
       startingXSpeed = 3;
       startingYSpeed = 2;
-      difficultyMode = 0;
+      difficultyMode = 2;
     }
     // Sets Hard Difficulty Mode
     else if (!(BIT3 & switches)){
+      selectorLayer.pos.axes[1] = 123;
+      layerDraw(&selectorLayer);
       startingXSpeed = 4;
       startingYSpeed = 3;
-      difficultyMode = 4;
+      difficultyMode = 6;
     }
   }
   // Game Over Screen, Displays Winner And Lets User Restart The Game
@@ -426,11 +446,13 @@ void selectMode(){
     // Restart Game 
     if (!(BIT0 & switches)) {
       clearScreen(0);
+      selectorLayer.pos.axes[1] = 83;
       startingXSpeed = 2;
       startingYSpeed = 1;
       difficultyMode = 0;
       modeSelector = 0;
       _delay(50);
+      layerDraw(&selectorLayer);
     } 
   }
 }
@@ -453,7 +475,7 @@ void main()
   shapeInit();
   layerInit(&layer0);
   //layerDraw(&layer0);
-
+  layerDraw(&selectorLayer);
   layerGetBounds(&fieldLayer, &fieldFence); 
    
   enableWDTInterrupts();      /**< enable periodic interrupt */
@@ -508,7 +530,7 @@ void wdt_c_handler()
   static short count = 0;
   P1OUT |= GREEN_LED;		      /**< Green LED on when cpu on */
   count ++;
-  if (count == 15) {
+  if (count == 14) {
     // To Keep Game From Starting During Menus
     if (modeSelector == 1){
       mlAdvance(&ml0, &fieldFence);
