@@ -41,6 +41,8 @@ static int topPongBarXPosition = 0;
 static int bottomPongBarXPosition = 0;
 static char playerOneScore = '6';
 static char playerTwoScore = '6';
+static int startingXSpeed = 2;
+static int startingYSpeed = 1;
 
 Layer fieldLayer = {		/* playing field as a layer */
   (AbShape *) &fieldOutline,
@@ -153,8 +155,8 @@ void incrementBallVelocity(MovLayer *pongBall){
 
 void resetBallVelocity(MovLayer *pongBall){
   velocityLimit = 0;
-  pongBall->velocity.axes[0] = 2;
-  pongBall->velocity.axes[1] = 1;
+  pongBall->velocity.axes[0] = startingXSpeed;
+  pongBall->velocity.axes[1] = startingYSpeed;
 }
 
 void resetPongBars(){
@@ -227,7 +229,7 @@ void mlAdvance(MovLayer *ml, Region *fence)
 	incrementBallVelocity(ml);
 	collisionBottomOccurred = 0;
 	collisionTopOccured = 1;
-	playCollisionSound();
+	//playCollisionSound();
       }
       // If the ball hits the bottom pong bar, only checking on the Y-Axis
       if (detectCollisionBottom(&pongBar, &(bottomPongBar.pos), &(ml->layer->pos)) && axis == 1){
@@ -236,7 +238,7 @@ void mlAdvance(MovLayer *ml, Region *fence)
 	incrementBallVelocity(ml);
 	collisionBottomOccurred = 1;
 	collisionTopOccured = 0;
-	playCollisionSound();
+	//playCollisionSound();
       }
     }
     // Sets The Ball's Next Position
@@ -390,17 +392,25 @@ void selectMode(){
       playerTwoScore = '6';
       playerOneScore = '6';
       modeSelector = 1;
+      ml0.velocity.axes[0] = startingXSpeed;
+      ml0.velocity.axes[1] = startingYSpeed;
     }
     // Sets Easy Difficulty Mode
     else if (!(BIT1 & switches)){
+      startingXSpeed = 2;
+      startingYSpeed = 1;
       difficultyMode = -4;
     }
     // Sets Medium Difficulty Mode
     else if (!(BIT2 & switches)){
+      startingXSpeed = 3;
+      startingYSpeed = 2;
       difficultyMode = 0;
     }
     // Sets Hard Difficulty Mode
     else if (!(BIT3 & switches)){
+      startingXSpeed = 4;
+      startingYSpeed = 3;
       difficultyMode = 4;
     }
   }
@@ -416,6 +426,8 @@ void selectMode(){
     // Restart Game 
     if (!(BIT0 & switches)) {
       clearScreen(0);
+      startingXSpeed = 2;
+      startingYSpeed = 1;
       difficultyMode = 0;
       modeSelector = 0;
       _delay(50);
