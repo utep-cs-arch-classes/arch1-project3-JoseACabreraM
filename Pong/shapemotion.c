@@ -1,4 +1,4 @@
-/** \file shapemotion.c
+/** \File shapemotion.c
  *  \brief This is a simple shape motion demo.
  *  This demo creates two layers containing shapes.
  *  One layer contains a rectangle and the other a circle.
@@ -67,7 +67,7 @@ Layer bottomPongBar = {
 
 Layer layer0 = {		/**< Layer with an orange circle */
   (AbShape *)&circle8,
-  {(screenWidth/2)+10, (screenHeight/2)+5}, /**< bit below & right of center */
+  {(screenWidth/2)+10, (screenHeight/2)-10}, /**< bit below & right of center */
   {0,0}, {0,0},				    /* last & next pos */
   COLOR_WHITE,
   &bottomPongBar,
@@ -78,7 +78,7 @@ Layer layer0 = {		/**< Layer with an orange circle */
 
 MovLayer mtopPongBar = {&topPongBar, {1,1}, 0};
 MovLayer mbottomPongBar = {&bottomPongBar, {1,1}, 0};
-MovLayer ml0 = {&layer0, {3,2}, 0}; 
+MovLayer ml0 = {&layer0, {0,0}, 0}; 
 
 movLayerDraw(MovLayer *movLayers, Layer *layers)
 {
@@ -118,22 +118,29 @@ movLayerDraw(MovLayer *movLayers, Layer *layers)
 
 static int velocityLimit = 0;
 static int incrementX = 0;
+static int collisionBottomOccurred = 0;
+static int collisionTopOccured = 0;
+static int difficultyMode = 0;
 
 void incrementBallVelocity(MovLayer *pongBall){
 
-  if (velocityLimit < 8){
+  if (velocityLimit < (8 + difficultyMode)){
     if ( incrementX == 2) {
 	if (pongBall->velocity.axes[0] < 0){
 	  pongBall->velocity.axes[0]--;
+	  //pongBall->velocity.axes[0] -= difficultyMode;
 	} else {
 	  pongBall->velocity.axes[0]++;
+	  //pongBall->velocity.axes[0] += difficultyMode;
 	}
 	incrementX = 0;
     } else {
       if (pongBall->velocity.axes[1] < 0){
 	pongBall->velocity.axes[1]--;
+	//pongBall->velocity.axes[1] -= difficultyMode;
       } else {
 	pongBall->velocity.axes[1]++;
+	//pongBall->velocity.axes[1] += difficultyMode;
       }
       incrementX++;
     }
@@ -144,11 +151,9 @@ void incrementBallVelocity(MovLayer *pongBall){
 }
 
 void resetBallVelocity(MovLayer *pongBall){
-
   velocityLimit = 0;
   pongBall->velocity.axes[0] = 2;
   pongBall->velocity.axes[1] = 1;
-  
 }
 
 void resetPongBars(){
@@ -158,9 +163,29 @@ void resetPongBars(){
   movLayerDraw(&mbottomPongBar, &bottomPongBar);
 }
 
+void playCollisionSound(){
+  CCR0 = 2000;
+  CCR1 = 2000 >> 1;
+}
 
-static int collisionBottomOccurred = 0;
-static int collisionTopOccured = 0;
+void resetSound(){
+  CCR0 = 0;
+  CCR1 = 0 >> 1;
+}
+
+void handleCollisionOnFence(Vec2* newPos, MovLayer* ml){
+  newPos->axes[1] = (screenHeight/2)-10;
+  newPos->axes[0] = (screenWidth/2)+10;
+  resetBallVelocity(ml);
+  resetPongBars();
+  collisionBottomOccurred = 0;
+  collisionTopOccured = 0;
+}
+
+void handleCollisionOnBar(){
+  
+}
+
 //Region fence = {{10,30}, {SHORT_EDGE_PIXELS-10, LONG_EDGE_PIXELS-10}}; /**< Create a fence region */
 
 /** Advances a moving shape within a fence
@@ -174,35 +199,27 @@ void mlAdvance(MovLayer *ml, Region *fence, Region *topPongBarFence, Region *bot
   Vec2 newPos;
   u_char axis;
   Region shapeBoundary;
-  CCR0 = 0;
-  CCR1 = 0 >> 1;
+
+  resetSound();
+  
   for (; ml; ml = ml->next) {
     vec2Add(&newPos, &ml->layer->posNext, &ml->velocity);
     abShapeGetBounds(ml->layer->abShape, &newPos, &shapeBoundary);
+
     for (axis = 0; axis < 2; axis++) {
       // If the ball hits the fence
       if ((shapeBoundary.topLeft.axes[axis] < fence->topLeft.axes[axis]) || (shapeBoundary.botRight.axes[axis] > fence->botRight.axes[axis])){
 	if(detectCollisionTopFence(&fieldOutline, &(fieldLayer.pos), &(ml->layer->pos)) && axis == 1){
-	  newPos.axes[axis] = (screenHeight/2)+5;
-	  newPos.axes[0] = (screenWidth/2)+10;
-	  playerOneScore++;
-	  resetBallVelocity(ml);
-	  resetPongBars();
-	  collisionBottomOccurred = 0;
-	  collisionTopOccured = 0;
-	} else if(detectCollisionBottomFence(&fieldOutline, &(fieldLayer.pos), &(ml->layer->pos)) && axis == 1){
-          newPos.axes[axis] = (screenHeight/2)+5;
-	  newPos.axes[0] = (screenWidth/2)+10;
-	  ml->velocity.axes[0] = 4;
-	  ml->velocity.axes[1] = 3;
+	  handleCollisionOnFence(&newPos, ml);
 	  playerTwoScore++;
-	  resetBallVelocity(ml);
-	  resetPongBars();
-	  collisionBottomOccurred = 0;
-	  collisionTopOccured = 0;
-	} else {
-	int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
-        newPos.axes[axis] += (2*velocity);
+	  //playerTwoScore %= ':';
+	} else if(detectCollisionBottomFence(&fieldOutline, &(fieldLayer.pos), &(ml->layer->pos)) && axis == 1){
+	  handleCollisionOnFence(&newPos, ml);
+	  playerOneScore++;
+	  //playerOneScore %= ':';
+	} else { 
+	  int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
+	  newPos.axes[axis] += (2*velocity);
 	}
       }
       // If the ball hits the top pong bar, only checking on the Y-Axis 
@@ -212,8 +229,7 @@ void mlAdvance(MovLayer *ml, Region *fence, Region *topPongBarFence, Region *bot
 	incrementBallVelocity(ml);
 	collisionBottomOccurred = 0;
 	collisionTopOccured = 1;
-	CCR0 = 2000;
-	CCR1 = 2000 >> 1;
+	playCollisionSound();
       }
       // If the ball hits the bottom pong bar, only checking on the Y-Axis
       if (detectCollisionBottom(&pongBar, &(bottomPongBar.pos), &(ml->layer->pos)) && axis == 1){
@@ -222,16 +238,17 @@ void mlAdvance(MovLayer *ml, Region *fence, Region *topPongBarFence, Region *bot
 	incrementBallVelocity(ml);
 	collisionBottomOccurred = 1;
 	collisionTopOccured = 0;
-	CCR0 = 2000;
-	CCR1 = 2000 >> 1;
+	playCollisionSound();
       }
-    } 
+    }
+    
     ml->layer->posNext = newPos;
   }
 }
 
 
-int detectCollisionTopFence(const AbRect* rect, const Vec2* centerPos, const Vec2 *pixel){
+
+int detectCollisionBottomFence(const AbRect* rect, const Vec2* centerPos, const Vec2 *pixel){
   int i = 0;
   Vec2 centerPos1 = *centerPos;
   for (i = -100; i < 100; i++){
@@ -247,7 +264,7 @@ int detectCollisionTopFence(const AbRect* rect, const Vec2* centerPos, const Vec
   return 0;
 }
 
-int detectCollisionBottomFence(const AbRect* rect, const Vec2* centerPos, const Vec2 *pixel){
+int detectCollisionTopFence(const AbRect* rect, const Vec2* centerPos, const Vec2 *pixel){
   int i = 0;
   Vec2 centerPos1 = *centerPos;
   for (i = -100; i < 100; i++){
@@ -308,14 +325,14 @@ int detectCollisionBottom(const AbRect* rect, const Vec2* centerPos, const Vec2 
 void movtopPongBar(int switches){
     mtopPongBar.layer->posNext.axes[0] = mtopPongBar.layer->pos.axes[0] + topPongBarXPosition;
     if (!(BIT0&switches)){
-      if (mtopPongBar.layer->posNext.axes[0] >= 28){
-	topPongBarXPosition = -10;
+      if (mtopPongBar.layer->posNext.axes[0] >= 30){
+	topPongBarXPosition = -12;
       } else {
 	topPongBarXPosition = 0;
       }
     } else if (!(BIT1 & switches)){
-      if (mtopPongBar.layer->posNext.axes[0] <= screenWidth - 28){
-	topPongBarXPosition = 10;
+      if (mtopPongBar.layer->posNext.axes[0] <= screenWidth - 30){
+	topPongBarXPosition = 12;
       }  else {
 	topPongBarXPosition = 0;
       }
@@ -328,14 +345,14 @@ void movtopPongBar(int switches){
 void movbottomPongBar(int switches){
     mbottomPongBar.layer->posNext.axes[0] = mbottomPongBar.layer->pos.axes[0] + bottomPongBarXPosition;
     if (!(BIT2 &switches)){
-      if (mbottomPongBar.layer->posNext.axes[0] >= 28){
-	    bottomPongBarXPosition = -10;
+      if (mbottomPongBar.layer->posNext.axes[0] >= 30){
+	    bottomPongBarXPosition = -12;
       } else {
 	    bottomPongBarXPosition = 0;
       }
     } else if (!(BIT3 & switches)){
-      if (mbottomPongBar.layer->posNext.axes[0] <= screenWidth - 28){
-	    bottomPongBarXPosition = 10;
+      if (mbottomPongBar.layer->posNext.axes[0] <= screenWidth - 30){
+	    bottomPongBarXPosition = 12;
       }  else {
 	    bottomPongBarXPosition = 0;
       }
@@ -346,13 +363,64 @@ void movbottomPongBar(int switches){
 }
 
 
+
 u_int bgColor = COLOR_BLACK;     /**< The background color */
 int redrawScreen = 1;           /**< Boolean for whether screen needs to be redrawn */
-static int gameResetCounter = 0;
 
+static int gameResetCounter = 0;
+static int modeSelector = 0;
+static char* winner;
+int switches;
+ 
 Region fieldFence;		/**< fence around playing field  */
 Region topPongBarFence;
 Region bottomPongBarFence;
+
+void selectMode(){
+  layerInit(&layer0);
+  if (modeSelector == 0){
+    drawString5x7(15, 40, "    PONG", COLOR_WHITE, COLOR_BLACK);
+    drawString5x7(15, 60, "BTN1 - Start", COLOR_WHITE, COLOR_BLACK);
+    drawString5x7(15, 80, "BTN2 - Set Easy", COLOR_WHITE, COLOR_BLACK);
+    drawString5x7(15, 100, "BTN3 - Set Medium", COLOR_WHITE, COLOR_BLACK);
+    drawString5x7(15, 120, "BTN4 - Set Hard", COLOR_WHITE, COLOR_BLACK);
+    if (!(BIT0 & switches)) {
+      clearScreen(0);
+      _delay(50);
+      layerInit(&layer0);
+      ml0.velocity.axes[0] = 2;
+      ml0.velocity.axes[1] = 1;
+      playerTwoScore = '0';
+      playerOneScore = '0';
+      modeSelector = 1;
+    } else if (!(BIT1 & switches)){
+      difficultyMode = -4;
+    } else if (!(BIT2 & switches)){
+      difficultyMode = 0;
+    } else if (!(BIT3 & switches)){
+      difficultyMode = 4;
+    }
+  }
+  if (modeSelector == 2){
+    //drawString5x7(15, 60, "", COLOR_WHITE, COLOR_BLACK);
+    drawString5x7(7, 5, "Player 1 - ", COLOR_WHITE, COLOR_BLACK);
+    drawString5x7(screenWidth/2 - 2, screenHeight-10, "- Player 2", COLOR_WHITE, COLOR_BLACK);
+    drawChar5x7(75, 5, playerOneScore, COLOR_WHITE, COLOR_BLACK);
+    drawChar5x7(screenWidth/2 - 15, screenHeight-10, playerTwoScore, COLOR_WHITE, COLOR_BLACK);
+    drawString5x7(10, 60, "  Game Over", COLOR_WHITE, COLOR_BLACK);
+    drawString5x7(15, 80, winner, COLOR_WHITE, COLOR_BLACK);
+    drawString5x7(15, 100, " BTN1 - Menu", COLOR_WHITE, COLOR_BLACK);
+    
+    if (!(BIT0 & switches)) {
+      clearScreen(0);
+      difficultyMode = 0;
+      modeSelector = 0;
+      _delay(50);
+    }
+    
+  }
+  
+}
 
 /** Initializes everything, enables interrupts and green LED, 
  *  and handles the rendering for the screen
@@ -364,7 +432,7 @@ void main()
 
   configureClocks();
   lcd_init();
-  shapeInit();
+  //shapeInit();
   p2sw_init(BIT0 + BIT1 + BIT2 + BIT3);
 
   timerAUpmode();
@@ -372,11 +440,11 @@ void main()
   P2SEL &= ~BIT7;
   P2SEL |= BIT6;
   P2DIR = BIT6;
-  
-  shapeInit();
 
+  clearScreen(0);
+  shapeInit();
   layerInit(&layer0);
-  layerDraw(&layer0);
+  //layerDraw(&layer0);
 
   layerGetBounds(&fieldLayer, &fieldFence); 
   layerGetBounds(&topPongBar,&topPongBarFence); 
@@ -385,36 +453,45 @@ void main()
   enableWDTInterrupts();      /**< enable periodic interrupt */
   or_sr(0x8);	              /**< GIE (enable interrupts) */
 
-  for(;;) { 
-    while (!redrawScreen) { /**< Pause CPU if screen doesn't need updating */
-      P1OUT &= ~GREEN_LED;    /**< Green led off witHo CPU */
-      or_sr(0x10);	      /**< CPU OFF */
-    }
-    P1OUT |= GREEN_LED;       /**< Green led on when CPU on */
-    redrawScreen = 0;
+  for(;;) {
+    switches = p2sw_read();
+    if (modeSelector != 1){
+      selectMode();
+    } else {
+      while (!redrawScreen) { /**< Pause CPU if screen doesn't need updating */
+	P1OUT &= ~GREEN_LED;    /**< Green led off witHo CPU */
+	or_sr(0x10);	      /**< CPU OFF */
+      }
 
+      P1OUT |= GREEN_LED;       /**< Green led on when CPU on */
+      redrawScreen = 0;
     
-    drawString5x7(7, 5, "Player 1 - ", COLOR_WHITE, COLOR_BLACK);
-    drawString5x7(screenWidth/2 -2, screenHeight-10, "- Player 2", COLOR_WHITE, COLOR_BLACK);
-    drawChar5x7(75, 5, playerOneScore, COLOR_WHITE, COLOR_BLACK);
-    drawChar5x7(screenWidth/2 - 10, screenHeight-10, playerTwoScore, COLOR_WHITE, COLOR_BLACK);
-    
-    
-    int switches = p2sw_read();
-    movtopPongBar(switches);
-    movbottomPongBar(switches);
-    movLayerDraw(&ml0, &layer0);
-    
-    if (playerOneScore == '9' || playerTwoScore == '9'){
-      
       drawString5x7(7, 5, "Player 1 - ", COLOR_WHITE, COLOR_BLACK);
       drawString5x7(screenWidth/2 -2, screenHeight-10, "- Player 2", COLOR_WHITE, COLOR_BLACK);
-      drawChar5x7(75, 5, playerOneScore, COLOR_WHITE, COLOR_BLACK);
-      drawChar5x7(screenWidth/2 - 10, screenHeight-10, playerTwoScore, COLOR_WHITE, COLOR_BLACK);
-      drawString5x7(60, 60, "Game Over", COLOR_WHITE, COLOR_BLACK);
       
+      movtopPongBar(switches);
+      movbottomPongBar(switches);
+      movLayerDraw(&ml0, &layer0);
+
+      if (playerOneScore == ':' || playerTwoScore == ':'){
+	//drawString5x7(7, 5, "Player 1 - ", COLOR_WHITE, COLOR_BLACK);
+	//drawString5x7(screenWidth/2 -2, screenHeight-10, "- Player 2", COLOR_WHITE, COLOR_BLACK);
+	//drawChar5x7(75, 5, playerOneScore, COLOR_WHITE, COLOR_BLACK);
+	//drawChar5x7(screenWidth/2 - 10, screenHeight-10, playerTwoScore, COLOR_WHITE, COLOR_BLACK);
+	//drawString5x7(60, 60, "Game Over", COLOR_WHITE, COLOR_BLACK);
+	if (playerOneScore == ':'){
+	  winner = "Player 1 Won!";
+	  playerOneScore = 'W';
+	} else {
+	  winner = "Player 2 Won!";
+	  playerTwoScore = 'W';
+	}
+	modeSelector = 2;
+	clearScreen(0);
+      }
+      drawChar5x7(75, 5, playerOneScore, COLOR_WHITE, COLOR_BLACK);
+      drawChar5x7(screenWidth/2 - 15, screenHeight-10, playerTwoScore, COLOR_WHITE, COLOR_BLACK);
     }
-    
   }
 }
 
