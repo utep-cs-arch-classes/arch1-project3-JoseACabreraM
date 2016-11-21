@@ -39,8 +39,9 @@ AbRectOutline fieldOutline = {	/* playing field */
 
 static int topPongBarXPosition = 0;
 static int bottomPongBarXPosition = 0;
-static char playerOneScore = '0';
-static char playerTwoScore = '0';
+static char playerOneScore = '6';
+static char playerTwoScore = '6';
+
 Layer fieldLayer = {		/* playing field as a layer */
   (AbShape *) &fieldOutline,
   {screenWidth/2, screenHeight/2},/**< center */
@@ -78,7 +79,7 @@ Layer layer0 = {		/**< Layer with an orange circle */
 
 MovLayer mtopPongBar = {&topPongBar, {1,1}, 0};
 MovLayer mbottomPongBar = {&bottomPongBar, {1,1}, 0};
-MovLayer ml0 = {&layer0, {0,0}, 0}; 
+MovLayer ml0 = {&layer0, {2,1}, 0}; 
 
 movLayerDraw(MovLayer *movLayers, Layer *layers)
 {
@@ -383,7 +384,7 @@ Region bottomPongBarFence;
 
 void selectMode(){
   // To Keep Game From Starting While In A Menu Screen
-  layerInit(&layer0);
+  //layerInit(&layer0);
   // Menu Screen, Lets User Set Difficulty Mode And Start Game 
   if (modeSelector == 0){
     drawString5x7(15, 40, "    PONG", COLOR_WHITE, COLOR_BLACK);
@@ -395,11 +396,11 @@ void selectMode(){
 	if (!(BIT0 & switches)) { 
       clearScreen(0);
       _delay(50);
-      layerInit(&layer0);
-      ml0.velocity.axes[0] = 2;
-      ml0.velocity.axes[1] = 1;
-      playerTwoScore = '0';
-      playerOneScore = '0';
+      //layerInit(&layer0);
+      //ml0.velocity.axes[0] = 2;
+      //ml0.velocity.axes[1] = 1;
+      playerTwoScore = '6';
+      playerOneScore = '6';
       modeSelector = 1;
     } 
 	// Sets Easy Difficulty Mode
@@ -510,7 +511,9 @@ void wdt_c_handler()
   P1OUT |= GREEN_LED;		      /**< Green LED on when cpu on */
   count ++;
   if (count == 15) {
-    mlAdvance(&ml0, &fieldFence, &topPongBarFence, &bottomPongBarFence);
+	if (modeSelector == 1){
+	  mlAdvance(&ml0, &fieldFence, &topPongBarFence, &bottomPongBarFence);
+	}
     if (p2sw_read())
       redrawScreen = 1;
     count = 0;
