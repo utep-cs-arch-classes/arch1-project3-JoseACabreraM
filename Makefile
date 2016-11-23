@@ -4,7 +4,7 @@ all:
 	(cd shapeLib; make install)
 	(cd circleLib; make install)
 	(cd p2swLib; make install)
-	(cd shape-motion-demo; make)
+	(cd Pong; make)
 
 doc:
 	rm -rf doxygen_docs
@@ -16,5 +16,6 @@ clean:
 	(cd p2swLib; make clean)
 	(cd shape-motion-demo; make clean)
 	(cd circleLib; make clean)
+	(cd Pong; make clean)
 	rm -rf lib h
 	rm -rf doxygen_docs/*
