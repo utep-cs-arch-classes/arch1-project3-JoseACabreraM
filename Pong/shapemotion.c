@@ -153,17 +153,13 @@ void incrementBallVelocity(MovLayer *pongBall){
     } else {
       if (pongBall->velocity.axes[1] < 0){
 	pongBall->velocity.axes[1]--;
-	//pongBall->velocity.axes[1] -= difficultyMode;
       } else {
 	pongBall->velocity.axes[1]++;
-	//pongBall->velocity.axes[1] += difficultyMode;
       }
       incrementX++;
     }
-  
   velocityLimit++;
   }
-  
 }
 
 void resetBallVelocity(MovLayer *pongBall){
@@ -179,15 +175,17 @@ void resetPongBars(){
   movLayerDraw(&mbottomPongBar, &bottomPongBar);
 }
 
+
+/* Moved to Assembly 
 void playCollisionSound(){
   CCR0 = 2000;
   CCR1 = 2000 >> 1;
 }
-
 void resetSound(){
   CCR0 = 0;
   CCR1 = 0 >> 1;
 }
+*/
 
 void handleCollisionOnFence(Vec2* newPos, MovLayer* ml){
   newPos->axes[1] = (screenHeight/2)-10;
@@ -196,10 +194,6 @@ void handleCollisionOnFence(Vec2* newPos, MovLayer* ml){
   resetPongBars();
   collisionBottomOccurred = 0;
   collisionTopOccured = 0;
-}
-
-void handleCollisionOnBar(){
-  
 }
 
 //Region fence = {{10,30}, {SHORT_EDGE_PIXELS-10, LONG_EDGE_PIXELS-10}}; /**< Create a fence region */
@@ -227,9 +221,11 @@ void mlAdvance(MovLayer *ml, Region *fence)
 	if (detectCollisionTopFence(&fieldOutline, &(fieldLayer.pos), &(ml->layer->pos)) && axis == 1){
 	  handleCollisionOnFence(&newPos, ml);
 	  playerTwoScore++;
+	  playCollisionSoundOnFence();
 	} else if (detectCollisionBottomFence(&fieldOutline, &(fieldLayer.pos), &(ml->layer->pos)) && axis == 1){
 	  handleCollisionOnFence(&newPos, ml);
 	  playerOneScore++;
+	  playCollisionSoundOnFence();
     	} else { 
 	  int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
 	  newPos.axes[axis] += (2*velocity);
@@ -242,7 +238,7 @@ void mlAdvance(MovLayer *ml, Region *fence)
 	incrementBallVelocity(ml);
 	collisionBottomOccurred = 0;
 	collisionTopOccured = 1;
-	playCollisionSound();
+	playCollisionSoundOnBar();
       }
       // If the ball hits the bottom pong bar, only checking on the Y-Axis
       if (detectCollisionBottom(&pongBar, &(bottomPongBar.pos), &(ml->layer->pos)) && axis == 1){
@@ -251,7 +247,7 @@ void mlAdvance(MovLayer *ml, Region *fence)
 	incrementBallVelocity(ml);
 	collisionBottomOccurred = 1;
 	collisionTopOccured = 0;
-	playCollisionSound();
+	playCollisionSoundOnBar();
       }
     }
     // Sets The Ball's Next Position
