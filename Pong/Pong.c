@@ -506,8 +506,8 @@ void main()
       // Moves The Ball
       movLayerDraw(&mpongBall, &pongBall);
       // Checks If Either Player Has Scored 10 Times And Terminates The Game
-      if (playerOneScore == ':' || playerTwoScore == ':'){
-        if (playerOneScore == ':'){
+      if (playerOneScore == '5' || playerTwoScore == '5'){
+        if (playerOneScore == '5'){
           winner = "Player 1 Won!";
           playerOneScore = 'W';
         } else {
